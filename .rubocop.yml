@@ -1,34 +1,56 @@
 inherit_from: .rubocop_todo.yml
 
-Lint/EndAlignment:
-  AlignWith: variable
-
-Style/AccessModifierIndentation:
+Layout/AccessModifierIndentation:
   EnforcedStyle: outdent
+
+Layout/AlignHash:
+  EnforcedLastArgumentHashStyle: always_ignore
+
+Layout/AlignParameters:
+  EnforcedStyle: with_fixed_indentation
+
+Layout/CaseIndentation:
+  EnforcedStyle: end
+
+Layout/IndentArray:
+  EnforcedStyle: consistent
+
+Layout/IndentHash:
+  EnforcedStyle: consistent
+
+Layout/IndentHeredoc:
+  Enabled: false
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+
+Layout/SpaceInsideHashLiteralBraces:
+  EnforcedStyle: no_space
+
+Lint/AmbiguousBlockAssociation:
+  Enabled: false
+
+Lint/EndAlignment:
+  EnforcedStyleAlignWith: variable
 
 Style/Alias:
   EnforcedStyle: prefer_alias_method
 
-Style/AlignHash:
-  EnforcedLastArgumentHashStyle: always_ignore
-
-Style/AlignParameters:
-  EnforcedStyle: with_fixed_indentation
-
 Style/AndOr:
   EnforcedStyle: conditionals
-
-Style/CaseIndentation:
-  IndentWhenRelativeTo: end
 
 Style/DoubleNegation:
   Enabled: false
 
-Style/IndentArray:
-  EnforcedStyle: consistent
+Metrics/BlockLength:
+  Exclude:
+    - '**/*_spec.rb'
+    - '**/*_examples.rb'
+    - '**/*.rake'
 
-Style/MultilineMethodCallIndentation:
-  EnforcedStyle: indented
-
-Style/MultilineOperationIndentation:
-  EnforcedStyle: indented
+Metrics/ModuleLength:
+  Exclude:
+    - '**/*_spec.rb'

@@ -1,3 +1,4 @@
+require 'active_support/version'
 require 'active_support/concern'
 require 'active_support/deprecation'
 require 'active_support/json'
@@ -16,8 +17,31 @@ require 'active_support/core_ext/string/inflections'
 require 'i18n/core_ext/hash'
 require 'chewy/backports/deep_dup' unless Object.respond_to?(:deep_dup)
 require 'singleton'
+require 'base64'
 
 require 'elasticsearch'
+
+def try_require(path)
+  require path
+rescue LoadError
+  nil
+end
+
+try_require 'kaminari'
+try_require 'kaminari/core'
+try_require 'will_paginate'
+try_require 'will_paginate/collection'
+try_require 'parallel'
+
+ActiveSupport.on_load(:active_record) do
+  try_require 'will_paginate/active_record'
+  try_require 'kaminari/activerecord'
+end
+
+ActiveSupport.on_load(:mongoid) do
+  try_require 'will_paginate/mongoid'
+  try_require 'kaminari/mongoid'
+end
 
 require 'chewy/version'
 require 'chewy/errors'
@@ -34,29 +58,8 @@ require 'chewy/fields/root'
 require 'chewy/journal'
 require 'chewy/railtie' if defined?(::Rails::Railtie)
 
-begin
-  require 'kaminari'
-  require 'chewy/query/pagination/kaminari'
-rescue LoadError
-  nil
-end
-
-begin
-  require 'will_paginate'
-  require 'will_paginate/collection'
-  require 'chewy/query/pagination/will_paginate'
-rescue LoadError
-  nil
-end
-
 ActiveSupport.on_load(:active_record) do
   extend Chewy::Type::Observe::ActiveRecordMethods
-
-  begin
-    require 'will_paginate/active_record'
-  rescue LoadError
-    nil
-  end
 end
 
 ActiveSupport.on_load(:mongoid) do
@@ -66,13 +69,6 @@ ActiveSupport.on_load(:mongoid) do
         include Chewy::Type::Observe::MongoidMethods
       end
     end
-  end
-
-  begin
-    require 'will_paginate/mongoid'
-    require 'chewy/query/pagination/will_paginate'
-  rescue LoadError
-    nil
   end
 end
 
@@ -87,29 +83,47 @@ module Chewy
   class << self
     attr_accessor :adapters
 
-    # Derives type from string `index#type` representation:
+    # Derives a single type for the passed string identifier if possible.
     #
-    #   Chewy.derive_type('users#user') # => UsersIndex::User
+    # @example
+    #   Chewy.derive_types(UsersIndex::User) # => UsersIndex::User
+    #   Chewy.derive_types('namespace/users') # => Namespace::UsersIndex::User
+    #   Chewy.derive_types('places') # => raises Chewy::UnderivableType
+    #   Chewy.derive_types('places#city') # => PlacesIndex::City
     #
-    # If index has only one type - it is possible to derive it without specification:
-    #
-    #   Chewy.derive_type('users') # => UsersIndex::User
-    #
-    # If index has more then one type - it raises Chewy::UnderivableType.
-    #
+    # @param name [String, Chewy::Type] string type identifier
+    # @raise [Chewy::UnderivableType] in cases when it is impossble to find index or type or more than one type found
+    # @return [Chewy::Type] an array of derived types
     def derive_type(name)
       return name if name.is_a?(Class) && name < Chewy::Type
 
-      index_name, type_name = name.split('#', 2)
-      class_name = "#{index_name.camelize}Index"
+      types = derive_types(name)
+      raise Chewy::UnderivableType, "Index `#{types.first.index}` has more than one type, please specify type via `#{types.first.index.derivable_name}#type_name`" unless types.one?
+      types.first
+    end
+
+    # Derives all the types for the passed string identifier if possible.
+    #
+    # @example
+    #   Chewy.derive_types('namespace/users') # => [Namespace::UsersIndex::User]
+    #   Chewy.derive_types('places') # => [PlacesIndex::City, PlacesIndex::Country]
+    #   Chewy.derive_types('places#city') # => [PlacesIndex::City]
+    #
+    # @param from [String] string type identifier
+    # @raise [Chewy::UnderivableType] in cases when it is impossible to find index or type
+    # @return [Array<Chewy::Type>] an array of derived types
+    def derive_types(from)
+      return from.types if from.is_a?(Class) && (from < Chewy::Index || from < Chewy::Type)
+
+      index_name, type_name = from.split('#', 2)
+      class_name = "#{index_name.camelize.gsub(/Index\z/, '')}Index"
       index = class_name.safe_constantize
       raise Chewy::UnderivableType, "Can not find index named `#{class_name}`" unless index && index < Chewy::Index
       if type_name.present?
-        index.type_hash[type_name] or raise Chewy::UnderivableType, "Index `#{class_name}` doesn`t have type named `#{type_name}`"
-      elsif index.types.one?
-        index.types.first
+        type = index.type_hash[type_name] or raise Chewy::UnderivableType, "Index `#{class_name}` doesn`t have type named `#{type_name}`"
+        [type]
       else
-        raise Chewy::UnderivableType, "Index `#{class_name}` has more than one type, please specify type via `#{index_name}#type_name`"
+        index.types
       end
     end
 
@@ -118,7 +132,7 @@ module Chewy
     def create_type(index, target, options = {}, &block)
       type = Class.new(Chewy::Type)
 
-      adapter = adapters.find { |klass| klass.accepts?(target) }.new(target, options)
+      adapter = adapters.find { |klass| klass.accepts?(target) }.new(target, **options)
 
       index.const_set(adapter.name, type)
       type.send(:define_singleton_method, :index) { index }
@@ -152,7 +166,7 @@ module Chewy
     # Be careful, if current prefix is blank, this will destroy all the indexes.
     #
     def massacre
-      Chewy.client.indices.delete(index: [Chewy.configuration[:prefix], '*'].delete_if(&:blank?).join('_'))
+      Chewy.client.indices.delete(index: [Chewy.configuration[:prefix], '*'].reject(&:blank?).join('_'))
       Chewy.wait_for_status
     end
     alias_method :delete_all, :massacre
@@ -202,5 +216,26 @@ module Chewy
       Chewy::Repository.instance
     end
     delegate(*Chewy::Repository.delegated, to: :repository)
+
+    def create_indices
+      Chewy::Index.descendants.each(&:create)
+    end
+
+    def create_indices!
+      Chewy::Index.descendants.each(&:create!)
+    end
+
+    def eager_load!
+      return unless defined?(Chewy::Railtie)
+      dirs = Chewy::Railtie.all_engines.map { |engine| engine.paths[Chewy.configuration[:indices_path]] }.compact.map(&:existent).flatten.uniq
+
+      dirs.each do |dir|
+        Dir.glob(File.join(dir, '**/*.rb')).each do |file|
+          require_dependency file
+        end
+      end
+    end
   end
 end
+
+require 'chewy/stash'

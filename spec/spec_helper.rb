@@ -14,21 +14,33 @@ require 'rspec/collection_matchers'
 
 require 'timecop'
 
-Kaminari::Hooks.init if defined?(::Kaminari)
+Kaminari::Hooks.init if defined?(::Kaminari::Hooks)
 
 require 'support/fail_helpers'
 require 'support/class_helpers'
 
 require 'chewy/rspec'
 
+host = ENV['ES_HOST'] || 'localhost'
+port = ENV['ES_PORT'] || 9250
+
 Chewy.settings = {
-  host: 'localhost:9250',
+  host: "#{host}:#{port}",
   wait_for_status: 'green',
   index: {
     number_of_shards: 1,
     number_of_replicas: 0
   }
 }
+
+Chewy.default_field_type = 'string' if Chewy::Runtime.version < '5.0'
+# Chewy.transport_logger = Logger.new(STDERR)
+
+KEYWORD_FIELD = if Chewy::Runtime.version < '5.0'
+  {type: 'string', index: 'not_analyzed'}
+else
+  {type: 'keyword'}
+end
 
 RSpec.configure do |config|
   config.mock_with :rspec
@@ -38,6 +50,8 @@ RSpec.configure do |config|
 
   config.include FailHelpers
   config.include ClassHelpers
+
+  Aws.config.update(stub_responses: true) if defined?(::Aws)
 end
 
 if defined?(::ActiveRecord)
@@ -48,7 +62,7 @@ elsif defined?(::Sequel)
   require 'support/sequel'
 else
   RSpec.configure do |config|
-    [:orm, :mongoid, :active_record, :sequel].each do |group|
+    %i[orm mongoid active_record sequel].each do |group|
       config.filter_run_excluding(group)
     end
   end

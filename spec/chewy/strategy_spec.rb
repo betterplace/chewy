@@ -64,12 +64,12 @@ describe Chewy::Strategy do
       around { |example| Chewy.strategy(:bypass) { example.run } }
 
       specify do
-        expect(CitiesIndex::City).not_to receive(:import)
+        expect(CitiesIndex::City).not_to receive(:import!)
         [city, other_city].map(&:save!)
       end
 
       specify do
-        expect(CitiesIndex::City).to receive(:import).with([city.id, other_city.id]).once
+        expect(CitiesIndex::City).to receive(:import!).with([city.id, other_city.id]).once
         Chewy.strategy(:atomic) { [city, other_city].map(&:save!) }
       end
     end
@@ -78,12 +78,12 @@ describe Chewy::Strategy do
       around { |example| Chewy.strategy(:urgent) { example.run } }
 
       specify do
-        expect(CitiesIndex::City).to receive(:import).at_least(2).times
+        expect(CitiesIndex::City).to receive(:import!).at_least(2).times
         [city, other_city].map(&:save!)
       end
 
       specify do
-        expect(CitiesIndex::City).to receive(:import).with([city.id, other_city.id]).once
+        expect(CitiesIndex::City).to receive(:import!).with([city.id, other_city.id]).once
         Chewy.strategy(:atomic) { [city, other_city].map(&:save!) }
       end
 
@@ -94,7 +94,7 @@ describe Chewy::Strategy do
           end
 
           stub_model(:city) do
-            update_index('cities#city') { { name: name } }
+            update_index('cities#city') { {name: name} }
           end
         end
 
@@ -106,7 +106,7 @@ describe Chewy::Strategy do
         context do
           before do
             stub_model(:city) do
-              update_index('cities#city') { { id: id.to_s, name: name } }
+              update_index('cities#city') { {id: id.to_s, name: name} }
             end
           end
 

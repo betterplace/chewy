@@ -1,52 +1,60 @@
 [![Gem Version](https://badge.fury.io/rb/chewy.svg)](http://badge.fury.io/rb/chewy)
-[![Build Status](https://travis-ci.org/toptal/chewy.svg)](https://travis-ci.org/toptal/chewy)
+[![CircleCI](https://circleci.com/gh/toptal/chewy/tree/master.svg?style=svg)](https://circleci.com/gh/toptal/chewy/tree/master)
 [![Code Climate](https://codeclimate.com/github/toptal/chewy.svg)](https://codeclimate.com/github/toptal/chewy)
 [![Inline docs](http://inch-ci.org/github/toptal/chewy.svg?branch=master)](http://inch-ci.org/github/toptal/chewy)
 
-<p align="right">Sponsored by</p>
-<p align="right"><a href="https://www.toptal.com/"><img src="https://www.toptal.com/assets/public/blocks/logo/big.png" alt="Toptal" width="105" height="34"></a></p>
-
 # Chewy
 
-Chewy is an ODM and wrapper for [the official Elasticsearch client](https://github.com/elastic/elasticsearch-ruby).
+Chewy is an ODM (Object Document Mapper), built on top of the [the official Elasticsearch client](https://github.com/elastic/elasticsearch-ruby).
 
 ## Table of Contents
 
-* [Why Chewy?] (#why-chewy)
-* [Usage] (#usage)
-  * [Client settings] (#client-settings)
-  * [Index definition] (#index-definition)
-  * [Type default import options] (#type-default-import-options)
-  * [Multi (nested) and object field types] (#multi-nested-and-object-field-types)
-  * [Geo Point fields] (#geo-point-fields)
-  * [Crutches™ technology] (#crutches-technology)
-  * [Witchcraft™ technology] (#witchcraft-technology)
-  * [Raw Import] (#raw-import)
-  * [Journaling] (#journaling)
-  * [Types access] (#types-access)
-  * [Index manipulation] (#index-manipulation)
-  * [Index update strategies] (#index-update-strategies)
-    * [Nesting] (#nesting)
-    * [Non-block notation] (#non-block-notation)
-    * [Designing your own strategies] (#designing-your-own-strategies)
-  * [Rails application strategies integration] (#rails-application-strategies-integration)
-  * [Index querying] (#index-querying)
-  * [Additional query action.] (#additional-query-action)
-  * [Filters query DSL] (#filters-query-dsl)
-  * [Faceting] (#faceting)
-  * [Aggregations] (#aggregations)
-  * [Script fields] (#script-fields)
-  * [Script scoring] (#script-scoring)
-  * [Boost Factor] (#boost-factor)
-  * [Objects loading] (#objects-loading)
-    * [NewRelic integration] (#newrelic-integration)
-  * [Rake tasks] (#rake-tasks)
-  * [Rspec integration] (#rspec-integration)
-  * [Minitest integration] (#minitest-integration)
-* [TODO a.k.a coming soon:] (#todo-aka-coming-soon)
-* [Contributing] (#contributing)
+* [Why Chewy?](#why-chewy)
+* [Installation](#installation)
+* [Usage](#usage)
+  * [Client settings](#client-settings)
+    * [AWS ElasticSearch configuration](#aws-elastic-search)
+  * [Index definition](#index-definition)
+  * [Type default import options](#type-default-import-options)
+  * [Multi (nested) and object field types](#multi-nested-and-object-field-types)
+  * [Parent and children types](#parent-and-children-types)
+  * [Geo Point fields](#geo-point-fields)
+  * [Crutches™ technology](#crutches-technology)
+  * [Witchcraft™ technology](#witchcraft-technology)
+  * [Raw Import](#raw-import)
+  * [Index creation during import](#index-creation-during-import)
+  * [Journaling](#journaling)
+  * [Types access](#types-access)
+  * [Index manipulation](#index-manipulation)
+  * [Index update strategies](#index-update-strategies)
+    * [Nesting](#nesting)
+    * [Non-block notation](#non-block-notation)
+    * [Designing your own strategies](#designing-your-own-strategies)
+  * [Rails application strategies integration](#rails-application-strategies-integration)
+  * [ActiveSupport::Notifications support](#activesupportnotifications-support)
+  * [NewRelic integration](#newrelic-integration)
+  * [Search requests](#search-requests)
+    * [Composing requests](#composing-requests)
+    * [Pagination](#pagination)
+    * [Named scopes](#named-scopes)
+    * [Scroll API](#scroll-api)
+    * [Loading objects](#loading-objects)
+    * [Legacy DSL incompatibilities](#legacy-dsl-incompatibilities)
+  * [Rake tasks](#rake-tasks)
+    * [chewy:reset](#chewyreset)
+    * [chewy:upgrade](#chewyupgrade)
+    * [chewy:update](#chewyupdate)
+    * [chewy:sync](#chewysync)
+    * [chewy:deploy](#chewydeploy)
+    * [Parallelizing rake tasks](#parallelizing-rake-tasks)
+    * [chewy:journal](#chewyjournal)
+  * [RSpec integration](#rspec-integration)
+  * [Minitest integration](#minitest-integration)
+* [Contributing](#contributing)
 
 ## Why Chewy?
+
+In this section we'll cover why you might want to use Chewy instead of the official `elasticsearch-ruby` client gem.
 
 * Multi-model indices.
 
@@ -66,10 +74,9 @@ Chewy is an ODM and wrapper for [the official Elasticsearch client](https://gith
 
 * Support for ActiveRecord, [Mongoid](https://github.com/mongoid/mongoid) and [Sequel](https://github.com/jeremyevans/sequel).
 
-
 ## Installation
 
-Add this line to your application's Gemfile:
+Add this line to your application's `Gemfile`:
 
     gem 'chewy'
 
@@ -81,13 +88,29 @@ Or install it yourself as:
 
     $ gem install chewy
 
+## Compatibility
+
+### Ruby
+
+Chewy is compatible with MRI 2.5-3.0¹. 
+
+> ¹ Ruby 3 is only supported with Rails 6.1
+
+### Elasticsearch
+
+Chewy 5 is compatible with Elasticsearch 5. Future versions of Chewy will support Elasticsearch 6 and Elasticsearch 7.
+
 ## Usage
 
 ### Client settings
 
-There are two ways to configure the Chewy client: the `Chewy.settings` hash and `chewy.yml`
+There are two ways to configure the Chewy client:
 
-You can create this file manually or run `rails g chewy:install`.
+* via the hash `Chewy.settings`
+* via the configuration file `chewy.yml`
+
+You can create `chewy.yml` manually or run `rails g chewy:install` to
+generate it.
 
 ```ruby
 # config/initializers/chewy.rb
@@ -118,6 +141,30 @@ Chewy.logger = Logger.new(STDOUT)
 ```
 
 See [config.rb](lib/chewy/config.rb) for more details.
+
+#### AWS Elasticsearch
+
+If you would like to use AWS's Elasticsearch using an IAM user policy, you will need to sign your requests for the `es:*` action by injecting the appropriate headers passing a proc to `transport_options`.
+You'll need an additional gem for Faraday middleware: add `gem 'faraday_middleware-aws-sigv4'` to your Gemfile.
+
+```ruby
+require 'faraday_middleware/aws_sigv4'
+
+Chewy.settings = {
+  host: 'http://my-es-instance-on-aws.us-east-1.es.amazonaws.com:80',
+  port: 80, # 443 for https host
+  transport_options: {
+    headers: { content_type: 'application/json' },
+    proc: -> (f) do
+        f.request :aws_sigv4,
+                  service: 'es',
+                  region: 'us-east-1',
+                  access_key_id: ENV['AWS_ACCESS_KEY'],
+                  secret_access_key: ENV['AWS_SECRET_ACCESS_KEY']
+    end
+  }
+}
+```
 
 ### Index definition
 
@@ -178,7 +225,7 @@ See [config.rb](lib/chewy/config.rb) for more details.
 
     define_type User.active.includes(:country, :badges, :projects) do
       root date_detection: false do
-        template 'about_translations.*', type: 'string', analyzer: 'standard'
+        template 'about_translations.*', type: 'text', analyzer: 'standard'
 
         field :first_name, :last_name
         field :email, analyzer: 'email'
@@ -198,7 +245,7 @@ See [config.rb](lib/chewy/config.rb) for more details.
   ```
 
   [See index settings here](https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-update-settings.html).
-  [See root object settings here](https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-root-object-type.html).
+  [See root object settings here](https://www.elastic.co/guide/en/elasticsearch/reference/current/dynamic-field-mapping.html).
 
   See [mapping.rb](lib/chewy/type/mapping.rb) for more details.
 
@@ -305,17 +352,29 @@ This will automatically set the type or root field to `object`. You may also spe
 To define a multi field you have to specify any type except for `object` or `nested` in the root field:
 
 ```ruby
-field :full_name, type: 'string', value: ->{ full_name.strip } do
+field :full_name, type: 'text', value: ->{ full_name.strip } do
   field :ordered, analyzer: 'ordered'
   field :untouched, index: 'not_analyzed'
 end
 ```
 
-The `value:` option for internal fields would no longer be effective.
+The `value:` option for internal fields will no longer be effective.
 
+### Parent and children types
+
+To define [parent](https://www.elastic.co/guide/en/elasticsearch/guide/current/parent-child-mapping.html) type for a given index_type, you can include root options for the type where you can specify parent_type and parent_id
+
+```ruby
+define_type User.includes(:account) do
+  root parent: 'account', parent_id: ->{ account_id } do
+    field :created_at, type: 'date'
+    field :task_id, type: 'integer'
+  end
+end
+```
 ### Geo Point fields
 
-You can use [Elasticsearch's geo mapping](https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-geo-point-type.html) with the `geo_point` field type, allowing you to query, filter and order by latitude and longitude. You can use the following hash format:
+You can use [Elasticsearch's geo mapping](https://www.elastic.co/guide/en/elasticsearch/reference/current/geo-point.html) with the `geo_point` field type, allowing you to query, filter and order by latitude and longitude. You can use the following hash format:
 
 ```ruby
 field :coordinates, type: 'geo_point', value: ->{ {lat: latitude, lon: longitude} }
@@ -345,7 +404,7 @@ class ProductsIndex < Chewy::Index
 end
 ```
 
-Then the Chewy reindexing flow would look like the following pseudo-code (even in Mongoid):
+Then the Chewy reindexing flow will look like the following pseudo-code (even in Mongoid):
 
 ```ruby
 Product.includes(:categories).find_in_batches(1000) do |batch|
@@ -380,7 +439,7 @@ class ProductsIndex < Chewy::Index
 end
 ```
 
-An example flow would look like this:
+An example flow will look like this:
 
 ```ruby
 Product.includes(:categories).find_in_batches(1000) do |batch|
@@ -481,12 +540,18 @@ end
 
 Also, you can pass `:raw_import` option to the `import` method explicitly.
 
+### Index creation during import
+
+By default, when you perform import Chewy checks whether an index exists and creates it if it's absent.
+You can turn off this feature to decrease Elasticsearch hits count.
+To do so you need to set `skip_index_creation_on_import` parameter to `false` in your `config/chewy.yml`
+
 
 ### Journaling
 
 You can record all actions that were made to the separate journal index in ElasticSearch.
-When you create/update/destroy your records, it will be saved in this special index.
-If you make something with a batch of records (e.g. during index reset) it will be saved as a one record, including primary keys of each document that was affected.
+When you create/update/destroy your documents, it will be saved in this special index.
+If you make something with a batch of documents (e.g. during index reset) it will be saved as a one record, including primary keys of each document that was affected.
 Common journal record looks like this:
 
 ```json
@@ -506,7 +571,7 @@ Also, you can specify journal index name. For example:
 ```yaml
 # config/chewy.yml
 production:
-  journal: true,
+  journal: true
   journal_name: my_super_journal
 ```
 
@@ -526,12 +591,9 @@ class CityIndex
 end
 ```
 
-You may be wondering why do you need it? The answer is simple: Not to lose the data.
-Imagine that:
-You reset your index in Zero Downtime manner (to separate index), and meantime somebody keeps updating the data frequently (to old index). So all these actions will be written to the journal index and you'll be able to apply them after index reset with `Chewy::Journal.apply_changes_from(Time.now - 1.hour)`.
+You may be wondering why do you need it? The answer is simple: not to lose the data.
 
-For index reset journaling is turned off even if you set `journal: true` in `config/chewy.yml` or in `default_import_options`.
-You can change it only if you pass `journal: true` parameter explicitly to `#import`.
+Imagine that you reset your index in a zero-downtime manner (to separate index), and at the meantime somebody keeps updating the data frequently (to old index). So all these actions will be written to the journal index and you'll be able to apply them after index reset using the `Chewy::Journal` interface.
 
 ### Types access
 
@@ -563,6 +625,7 @@ UsersIndex::User.import # import with 0 arguments process all the data specified
 UsersIndex::User.import User.where('rating > 100') # or import specified users scope
 UsersIndex::User.import User.where('rating > 100').to_a # or import specified users array
 UsersIndex::User.import [1, 2, 42] # pass even ids for import, it will be handled in the most effective way
+UsersIndex::User.import User.where('rating > 100'), update_fields: [:email] # if update fields are specified - it will update their values only with the `update` bulk action.
 
 UsersIndex.import # import every defined type
 UsersIndex.import user: User.where('rating > 100') # import only active users to `user` type.
@@ -632,12 +695,32 @@ Chewy.strategy(:sidekiq) do
 end
 ```
 
+The default queue name is `chewy`, you can customize it in settings: `sidekiq.queue_name`
+```
+Chewy.settings[:sidekiq] = {queue: :low}
+```
+
 #### `:active_job`
 
 This does the same thing as `:atomic`, but using ActiveJob. This will inherit the ActiveJob configuration settings including the `active_job.queue_adapter` setting for the environment. Patch `Chewy::Strategy::ActiveJob::Worker` for index updates improving.
 
 ```ruby
 Chewy.strategy(:active_job) do
+  City.popular.map(&:do_some_update_action!)
+end
+```
+
+The default queue name is `chewy`, you can customize it in settings: `active_job.queue_name`
+```
+Chewy.settings[:active_job] = {queue: :low}
+```
+
+#### `:shoryuken`
+
+This does the same thing as `:atomic`, but asynchronously using shoryuken. Patch `Chewy::Strategy::Shoryuken::Worker` for index updates improving.
+
+```ruby
+Chewy.strategy(:shoryuken) do
   City.popular.map(&:do_some_update_action!)
 end
 ```
@@ -652,7 +735,7 @@ Chewy.strategy(:urgent) do
 end
 ```
 
-This code would perform `City.popular.count` requests for ES documents update.
+This code will perform `City.popular.count` requests for ES documents update.
 
 It is convenient for use in e.g. the Rails console with non-block notation:
 
@@ -717,490 +800,6 @@ RSpec.configure do |config|
 end
 ```
 
-### Index querying
-
-```ruby
-scope = UsersIndex.query(term: {name: 'foo'})
-  .filter(range: {rating: {gte: 100}})
-  .order(created: :desc)
-  .limit(20).offset(100)
-
-scope.to_a # => will produce array of UserIndex::User or other types instances
-scope.map { |user| user.email }
-scope.total_count # => will return total objects count
-
-scope.per(10).page(3) # supports kaminari pagination
-scope.explain.map { |user| user._explanation }
-scope.only(:id, :email) # returns ids and emails only
-
-scope.merge(other_scope) # queries could be merged
-```
-
-Also, queries can be performed on a type individually:
-
-```ruby
-UsersIndex::User.filter(term: {name: 'foo'}) # will return UserIndex::User collection only
-```
-
-If you are performing more than one `filter` or `query` in the chain, all the filters and queries will be concatenated in the way specified by
-`filter_mode` and `query_mode` respectively.
-
-The default `filter_mode` is `:and` and the default `query_mode` is `bool`.
-
-Available filter modes are: `:and`, `:or`, `:must`, `:should` and any minimum_should_match-acceptable value
-
-Available query modes are: `:must`, `:should`, `:dis_max`, any minimum_should_match-acceptable value or float value for dis_max query with tie_breaker specified.
-
-```ruby
-UsersIndex::User.filter{ name == 'Fred' }.filter{ age < 42 } # will be wrapped with `and` filter
-UsersIndex::User.filter{ name == 'Fred' }.filter{ age < 42 }.filter_mode(:should) # will be wrapped with bool `should` filter
-UsersIndex::User.filter{ name == 'Fred' }.filter{ age < 42 }.filter_mode('75%') # will be wrapped with bool `should` filter with `minimum_should_match: '75%'`
-```
-
-See [query.rb](lib/chewy/query.rb) for more details.
-
-### Additional query action.
-
-You may also perform additional actions on the query scope, such as deleting of all the scope documents:
-
-```ruby
-UsersIndex.delete_all
-UsersIndex::User.delete_all
-UsersIndex.filter{ age < 42 }.delete_all
-UsersIndex::User.filter{ age < 42 }.delete_all
-```
-
-### Filters query DSL
-
-There is a test version of the filter-creating DSL:
-
-```ruby
-UsersIndex.filter{ name == 'Fred' } # will produce `term` filter.
-UsersIndex.filter{ age <= 42 } # will produce `range` filter.
-```
-
-The basis of the DSL is the expression. There are 2 types of expressions:
-
-* Simple function
-
-  ```ruby
-  UsersIndex.filter{ s('doc["num"] > 1') } # script expression
-  UsersIndex.filter{ q(query_string: {query: 'lazy fox'}) } # query expression
-  ```
-
-* Field-dependent composite expression
-  Consists of the field name (with or without dot notation), a value, and an action operator between them. The field name might take additional options for passing to the resulting expression.
-
-  ```ruby
-  UsersIndex.filter{ name == 'Name' } # simple field term filter
-  UsersIndex.filter{ name(:bool) == ['Name1', 'Name2'] } # terms query with `execution: :bool` option passed
-  UsersIndex.filter{ answers.title =~ /regexp/ } # regexp filter for `answers.title` field
-  ```
-
-You can combine expressions as you wish with the help of combination operators.
-
-```ruby
-UsersIndex.filter{ (name == 'Name') & (email == 'Email') } # combination produces `and` filter
-UsersIndex.filter{
-  must(
-    should(name =~ 'Fr').should_not(name == 'Fred') & (age == 42), email =~ /gmail\.com/
-  ) | ((roles.admin == true) & name?)
-} # many of the combination possibilities
-```
-
-There is also a special syntax for cache enabling:
-
-```ruby
-UsersIndex.filter{ ~name == 'Name' } # you can apply tilde to the field name
-UsersIndex.filter{ ~(name == 'Name') } # or to the whole expression
-
-# if you are applying cache to the one part of range filter
-# the whole filter will be cached:
-UsersIndex.filter{ ~(age > 42) & (age <= 50) }
-
-# You can pass cache options as a field option also.
-UsersIndex.filter{ name(cache: true) == 'Name' }
-UsersIndex.filter{ name(cache: false) == 'Name' }
-
-# With regexp filter you can pass _cache_key
-UsersIndex.filter{ name(cache: 'name_regexp') =~ /Name/ }
-# Or not
-UsersIndex.filter{ name(cache: true) =~ /Name/ }
-```
-
-Compliance cheatsheet for filters and DSL expressions:
-
-* Term filter
-
-  ```json
-  {"term": {"name": "Fred"}}
-  {"not": {"term": {"name": "Johny"}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ name == 'Fred' }
-  UsersIndex.filter{ name != 'Johny' }
-  ```
-
-* Terms filter
-
-  ```json
-  {"terms": {"name": ["Fred", "Johny"]}}
-  {"not": {"terms": {"name": ["Fred", "Johny"]}}}
-
-  {"terms": {"name": ["Fred", "Johny"], "execution": "or"}}
-
-  {"terms": {"name": ["Fred", "Johny"], "execution": "and"}}
-
-  {"terms": {"name": ["Fred", "Johny"], "execution": "bool"}}
-
-  {"terms": {"name": ["Fred", "Johny"], "execution": "fielddata"}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ name == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name != ['Fred', 'Johny'] }
-
-  UsersIndex.filter{ name(:|) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(:or) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(execution: :or) == ['Fred', 'Johny'] }
-
-  UsersIndex.filter{ name(:&) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(:and) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(execution: :and) == ['Fred', 'Johny'] }
-
-  UsersIndex.filter{ name(:b) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(:bool) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(execution: :bool) == ['Fred', 'Johny'] }
-
-  UsersIndex.filter{ name(:f) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(:fielddata) == ['Fred', 'Johny'] }
-  UsersIndex.filter{ name(execution: :fielddata) == ['Fred', 'Johny'] }
-  ```
-
-* Regexp filter (== and =~ are equivalent)
-
-  ```json
-  {"regexp": {"name.first": "s.*y"}}
-
-  {"not": {"regexp": {"name.first": "s.*y"}}}
-
-  {"regexp": {"name.first": {"value": "s.*y", "flags": "ANYSTRING|INTERSECTION"}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ name.first == /s.*y/ }
-  UsersIndex.filter{ name.first =~ /s.*y/ }
-
-  UsersIndex.filter{ name.first != /s.*y/ }
-  UsersIndex.filter{ name.first !~ /s.*y/ }
-
-  UsersIndex.filter{ name.first(:anystring, :intersection) == /s.*y/ }
-  UsersIndex.filter{ name.first(flags: [:anystring, :intersection]) == /s.*y/ }
-  ```
-
-* Prefix filter
-
-  ```json
-  {"prefix": {"name": "Fre"}}
-  {"not": {"prefix": {"name": "Joh"}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ name =~ re' }
-  UsersIndex.filter{ name !~ 'Joh' }
-  ```
-
-* Exists filter
-
-  ```json
-  {"exists": {"field": "name"}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ name? }
-  UsersIndex.filter{ !!name }
-  UsersIndex.filter{ !!name? }
-  UsersIndex.filter{ name != nil }
-  UsersIndex.filter{ !(name == nil) }
-  ```
-
-* Missing filter
-
-  ```json
-  {"missing": {"field": "name", "existence": true, "null_value": false}}
-  {"missing": {"field": "name", "existence": true, "null_value": true}}
-  {"missing": {"field": "name", "existence": false, "null_value": true}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ !name }
-  UsersIndex.filter{ !name? }
-  UsersIndex.filter{ name == nil }
-  ```
-
-* Range
-
-  ```json
-  {"range": {"age": {"gt": 42}}}
-  {"range": {"age": {"gte": 42}}}
-  {"range": {"age": {"lt": 42}}}
-  {"range": {"age": {"lte": 42}}}
-
-  {"range": {"age": {"gt": 40, "lt": 50}}}
-  {"range": {"age": {"gte": 40, "lte": 50}}}
-
-  {"range": {"age": {"gt": 40, "lte": 50}}}
-  {"range": {"age": {"gte": 40, "lt": 50}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ age > 42 }
-  UsersIndex.filter{ age >= 42 }
-  UsersIndex.filter{ age < 42 }
-  UsersIndex.filter{ age <= 42 }
-
-  UsersIndex.filter{ age == (40..50) }
-  UsersIndex.filter{ (age > 40) & (age < 50) }
-  UsersIndex.filter{ age == [40..50] }
-  UsersIndex.filter{ (age >= 40) & (age <= 50) }
-
-  UsersIndex.filter{ (age > 40) & (age <= 50) }
-  UsersIndex.filter{ (age >= 40) & (age < 50) }
-  ```
-
-* Bool filter
-
-  ```json
-  {"bool": {
-    "must": [{"term": {"name": "Name"}}],
-    "should": [{"term": {"age": 42}}, {"term": {"age": 45}}]
-  }}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ must(name == 'Name').should(age == 42, age == 45) }
-  ```
-
-* And filter
-
-  ```json
-  {"and": [{"term": {"name": "Name"}}, {"range": {"age": {"lt": 42}}}]}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ (name == 'Name') & (age < 42) }
-  ```
-
-* Or filter
-
-  ```json
-  {"or": [{"term": {"name": "Name"}}, {"range": {"age": {"lt": 42}}}]}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ (name == 'Name') | (age < 42) }
-  ```
-
-  ```json
-  {"not": {"term": {"name": "Name"}}}
-  {"not": {"range": {"age": {"lt": 42}}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ !(name == 'Name') } # or UsersIndex.filter{ name != 'Name' }
-  UsersIndex.filter{ !(age < 42) }
-  ```
-
-* Match all filter
-
-  ```json
-  {"match_all": {}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ match_all }
-  ```
-
-* Has child filter
-
-  ```json
-  {"has_child": {"type": "blog_tag", "query": {"term": {"tag": "something"}}}
-  {"has_child": {"type": "comment", "filter": {"term": {"user": "john"}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ has_child(:blog_tag).query(term: {tag: 'something'}) }
-  UsersIndex.filter{ has_child(:comment).filter{ user == 'john' } }
-  ```
-
-* Has parent filter
-
-  ```json
-  {"has_parent": {"type": "blog", "query": {"term": {"tag": "something"}}}}
-  {"has_parent": {"type": "blog", "filter": {"term": {"text": "bonsai three"}}}}
-  ```
-
-  ```ruby
-  UsersIndex.filter{ has_parent(:blog).query(term: {tag: 'something'}) }
-  UsersIndex.filter{ has_parent(:blog).filter{ text == 'bonsai three' } }
-  ```
-
-See [filters.rb](lib/chewy/query/filters.rb) for more details.
-
-### Faceting
-
-Facets are an optional sidechannel you can request from Elasticsearch describing certain fields of the resulting collection. The most common use for facets is to allow the user to continue filtering specifically within the subset, as opposed to the global index.
-
-For instance, let's request the `country` field as a facet along with our users collection. We can do this with the #facets method like so:
-
-```ruby
-UsersIndex.filter{ [...] }.facets({countries: {terms: {field: 'country'}}})
-```
-
-Let's look at what we asked from Elasticsearch. The facets setter method accepts a hash. You can choose custom/semantic key names for this hash for your own convenience (in this case I used the plural version of the actual field), in our case `countries`. The following nested hash tells ES to grab and aggregate values (terms) from the `country` field on our indexed records.
-
-The response will include the `:facets` sidechannel:
-
-```
-< { ... ,"facets":{"countries":{"_type":"terms","missing":?,"total":?,"other":?,"terms":[{"term":"USA","count":?},{"term":"Brazil","count":?}, ...}}
-```
-
-### Aggregations
-
-Aggregations are part of the optional sidechannel that can be requested with a query.
-
-You interact with aggregations using the composable #aggregations method (or its alias #aggs)
-
-Let's look at an example.
-
-```ruby
-class UsersIndex < Chewy::Index
-  define_type User do
-    field :name
-    field :rating
-  end
-end
-
-all_johns = UsersIndex::User.filter { name == 'john' }.aggs({ avg_rating: { avg: { field: 'rating' } } })
-
-avg_johns_rating = all_johns.aggs
-# => {"avg_rating"=>{"value"=>3.5}}
-```
-
-It is convenient to name aggregations that you intend to reuse regularly. This is achieve with the .aggregation method,
-which is also available under the .agg alias method.
-
-Here's the same example from before
-
-```ruby
-class UsersIndex < Chewy::Index
-  define_type User do
-    field :name
-    field :rating, type: "long"
-    agg :avg_rating do
-      { avg: { field: 'rating' } }
-    end
-  end
-end
-
-all_johns = UsersIndex::User.filter { name == 'john' }.aggs(:avg_rating)
-
-avg_johns_rating = all_johns.aggs
-# => {"avg_rating"=>{"value"=>3.5}}
-```
-
-It is possible to run into collisions between named aggregations. This occurs when there is more than one aggregation
- with the same name. To explicitly reference an aggregation you provide a string to the #aggs method of the form:
- `index_name#document_type.aggregation_name`
-
-Consider this example where there are two separate aggregations named `avg_rating`
-
-```ruby
-class UsersIndex < Chewy::Index
-  define_type User do
-    field :name
-    field :rating, type: "long"
-    agg :avg_rating do
-      { avg: { field: 'rating' } }
-    end
-  end
-  define_type Post do
-    field :title
-    field :body
-    field :comments do
-      field :message
-      field :rating, type: "long"
-    end
-    agg :avg_rating do
-      { avg: { field: 'comments.rating' } }
-    end
-  end
-end
-
-all_docs = UsersIndex.filter {match_all}.aggs("users#user.avg_rating")
-all_docs.aggs
-# => {"users#user.avg_rating"=>{"value"=>3.5}}
-```
-
-### Script fields
-
-Script fields allow you to execute Elasticsearch's scripting languages such as groovy and javascript. More about supported languages and what scripting is [here](https://www.elastic.co/guide/en/elasticsearch/reference/0.90/modules-scripting.html). This feature allows you to calculate the distance between geo points, for example. This is how to use the DSL:
-
-```ruby
-UsersIndex.script_fields(
-  distance: {
-    params: {
-      lat: 37.569976,
-      lon: -122.351591
-    },
-    script: "doc['coordinates'].distanceInMiles(lat, lon)"
-  }
-)
-```
-Here, `coordinates` is a field with type `geo_point`. There will be a `distance` field for the index's model in the search result.
-
-### Script scoring
-
-Script scoring is used to score the search results. All scores are added to the search request and combined according to boost mode and score mode. This can be useful if, for example, a score function is computationally expensive and it is sufficient to compute the score on a filtered set of documents. For example, you might want to multiply the score by another numeric field in the doc:
-
-```ruby
-UsersIndex.script_score("_score * doc['my_numeric_field'].value")
-```
-
-### Boost Factor
-
-Boost factors are a way to add a boost to a query where documents match the filter. If you have some users who are experts and some who are regular users, you might want to give the experts a higher score and boost to the top of the search results. You can accomplish this by using the #boost_factor method and adding a boost score of 5 for an expert user:
-
-```ruby
-UsersIndex.boost_factor(5, filter: {term: {type: 'Expert'}})
-```
-
-### Objects loading
-
-It is possible to load source objects from the database for every search result:
-
-```ruby
-scope = UsersIndex.filter(range: {rating: {gte: 100}})
-
-scope.load # => scope is marked to return User instances array
-scope.load.query(...) # => since objects are loaded lazily you can complete scope
-scope.load(user: { scope: ->{ includes(:country) }}) # you can also pass loading scopes for each
-                                                     # possibly returned type
-scope.load(user: { scope: User.includes(:country) }) # the second scope passing way.
-scope.load(scope: ->{ includes(:country) }) # and more common scope applied to every loaded object type.
-
-scope.only(:id).load # it is optimal to request ids only if you are not planning to use type objects
-```
-
-The `preload` method takes the same options as `load` and ORM/ODM objects will be loaded, but the scope will still return an array of Chewy wrappers. To access real objects use the `_object` wrapper method:
-
-```ruby
-UsersIndex.filter(range: {rating: {gte: 100}}).preload(...).query(...).map(&:_object)
-```
-
-See [loading.rb](lib/chewy/query/loading.rb) for more details.
-
 ### `ActiveSupport::Notifications` support
 
 Chewy has notifying the following events:
@@ -1230,57 +829,266 @@ Chewy has notifying the following events:
     }}
     ```
 
-#### NewRelic integration
+### NewRelic integration
 
 To integrate with NewRelic you may use the following example source (config/initializers/chewy.rb):
 
 ```ruby
-ActiveSupport::Notifications.subscribe('import_objects.chewy') do |name, start, finish, id, payload|
-  metric_name = "Database/ElasticSearch/import"
-  duration = (finish - start).to_f
-  logged = "#{payload[:type]} #{payload[:import].to_a.map{ |i| i.join(':') }.join(', ')}"
+require 'new_relic/agent/instrumentation/evented_subscriber'
 
-  self.class.trace_execution_scoped([metric_name]) do
-    NewRelic::Agent.instance.transaction_sampler.notice_sql(logged, nil, duration)
-    NewRelic::Agent.instance.sql_sampler.notice_sql(logged, metric_name, nil, duration)
-    NewRelic::Agent.record_metric(metric_name, duration)
+class ChewySubscriber < NewRelic::Agent::Instrumentation::EventedSubscriber
+  def start(name, id, payload)
+    event = ChewyEvent.new(name, Time.current, nil, id, payload)
+    push_event(event)
+  end
+
+  def finish(_name, id, _payload)
+    pop_event(id).finish
+  end
+
+  class ChewyEvent < NewRelic::Agent::Instrumentation::Event
+    OPERATIONS = {
+      'import_objects.chewy' => 'import',
+      'search_query.chewy' => 'search',
+      'delete_query.chewy' => 'delete'
+    }.freeze
+
+    def initialize(*args)
+      super
+      @segment = start_segment
+    end
+
+    def start_segment
+      segment = NewRelic::Agent::Transaction::DatastoreSegment.new product, operation, collection, host, port
+      if (txn = state.current_transaction)
+        segment.transaction = txn
+      end
+      segment.notice_sql @payload[:request].to_s
+      segment.start
+      segment
+    end
+
+    def finish
+      if (txn = state.current_transaction)
+        txn.add_segment @segment
+      end
+      @segment.finish
+    end
+
+    private
+
+    def state
+      @state ||= NewRelic::Agent::TransactionState.tl_get
+    end
+
+    def product
+      'Elasticsearch'
+    end
+
+    def operation
+      OPERATIONS[name]
+    end
+
+    def collection
+      payload.values_at(:type, :index)
+             .reject { |value| value.try(:empty?) }
+             .first
+             .to_s
+    end
+
+    def host
+      Chewy.client.transport.hosts.first[:host]
+    end
+
+    def port
+      Chewy.client.transport.hosts.first[:port]
+    end
   end
 end
 
-ActiveSupport::Notifications.subscribe('search_query.chewy') do |name, start, finish, id, payload|
-  metric_name = "Database/ElasticSearch/search"
-  duration = (finish - start).to_f
-  logged = "#{payload[:type].presence || payload[:index]} #{payload[:request]}"
+ActiveSupport::Notifications.subscribe(/.chewy$/, ChewySubscriber.new)
+```
 
-  self.class.trace_execution_scoped([metric_name]) do
-    NewRelic::Agent.instance.transaction_sampler.notice_sql(logged, nil, duration)
-    NewRelic::Agent.instance.sql_sampler.notice_sql(logged, metric_name, nil, duration)
-    NewRelic::Agent.record_metric(metric_name, duration)
-  end
+### Search requests
+
+Long story short: there is a new DSL that supports ES2 and ES5, the previous DSL version (which supports ES1 and ES2) documentation was moved to [LEGACY_DSL.md](LEGACY_DSL.md).
+
+If you want to use the old DSL - simply do `Chewy.search_class = Chewy::Query` somewhere before indices are initialized.
+
+The new DSL is enabled by default, here is a quick introduction.
+
+#### Composing requests
+
+The request DSL have the same chainable nature as AR or Mongoid ones. The main class is `Chewy::Search::Request`. It is possible to perform requests on behalf of indices or types:
+
+```ruby
+PlaceIndex.query(match: {name: 'London'}) # returns documents of any type
+PlaceIndex::City.query(match: {name: 'London'}) # returns cities only.
+```
+
+Main methods of the request DSL are: `query`, `filter` and `post_filter`, it is possible to pass pure query hashes or use `elasticsearch-dsl`. Also, there is an additional
+
+```ruby
+PlaceIndex
+  .filter(term: {name: 'Bangkok'})
+  .query { match name: 'London' }
+  .query.not(range: {population: {gt: 1_000_000}})
+```
+
+See https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html and https://github.com/elastic/elasticsearch-ruby/tree/master/elasticsearch-dsl for more details.
+
+An important part of requests manipulation is merging. There are 4 methods to perform it: `merge`, `and`, `or`, `not`. See [Chewy::Search::QueryProxy](lib/chewy/search/query_proxy.rb) for details. Also, `only` and `except` methods help to remove unneeded parts of the request.
+
+Every other request part is covered by a bunch of additional methods, see [Chewy::Search::Request](lib/chewy/search/request.rb) for details:
+
+```ruby
+PlaceIndex.limit(10).offset(30).order(:name, {population: {order: :desc}})
+```
+
+Request DSL also provides additional scope actions, like `delete_all`, `exists?`, `count`, `pluck`, etc.
+
+#### Pagination
+
+The request DSL supports pagination with `Kaminari` and `WillPaginate`. An appropriate extension is enabled on initializtion if any of libraries is available. See [Chewy::Search](lib/chewy/search.rb) and [Chewy::Search::Pagination](lib/chewy/search/pagination/) namespace for details.
+
+#### Named scopes
+
+Chewy supports named scopes functionality. There is no specialized DSL for named scopes definition, it is simply about defining class methods.
+
+See [Chewy::Search::Scoping](lib/chewy/search/scoping.rb) for details.
+
+#### Scroll API
+
+ElasticSearch scroll API is utilized by a bunch of methods: `scroll_batches`, `scroll_hits`, `scroll_wrappers` and `scroll_objects`.
+
+See [Chewy::Search::Scrolling](lib/chewy/search/scrolling.rb) for details.
+
+#### Loading objects
+
+It is possible to load ORM/ODM source objects with the `objects` method. To provide additional loading options use `load` method:
+
+```ruby
+PlacesIndex.load(scope: -> { active }).to_a # to_a returns `Chewy::Type` wrappers.
+PlacesIndex.load(scope: -> { active }).objects # An array of AR source objects.
+```
+
+See [Chewy::Search::Loader](lib/chewy/search/loader.rb) for more details.
+
+In case when it is necessary to iterate through both of the wrappers and objects simultaneously, `object_hash` method helps a lot:
+
+```ruby
+scope = PlacesIndex.load(scope: -> { active })
+scope.each do |wrapper|
+  scope.object_hash[wrapper]
 end
 ```
+
+#### Legacy DSL incompatibilities
+
+* Filters advanced block DSL is not supported anymore, `elasticsearch-dsl` is used instead.
+* Things like `query_mode` and `filter_mode` are in past, use advanced DSL to achieve similar behavior. See [Chewy::Search::QueryProxy](lib/chewy/search/query_proxy.rb) for details.
+* `preload` method is no more, the collection returned by scope doesn't depend on loading options, scope always returns `Chewy::Type` wrappers. To get ORM/ODM objects, use `#objects` method.
+* Some of the methods have changed their purpose: `only` was used to filter fields before, now it filters the scope. To filter fields use `source` or `stored_fields`.
+* `types!` method is no more, use `except(:types).types(...)`
+* Named aggregations are not supported, use named scopes instead.
+* A lot of query-level methods were not ported: everything that is related to boost and scoring. Use `query` manipulation to provide them.
+* `Chewy::Type#_object` returns nil always. Use `Chewy::Search::Response#object_hash` instead.
 
 ### Rake tasks
 
-Inside the Rails application, some index-maintaining rake tasks are defined.
+For a Rails application, some index-maintaining rake tasks are defined.
+
+#### `chewy:reset`
+
+Performs zero-downtime reindexing as described [here](https://www.elastic.co/blog/changing-mapping-with-zero-downtime). So the rake task creates a new index with unique suffix and then simply aliases it to the common index name. The previous index is deleted afterwards (see `Chewy::Index.reset!` for more details).
 
 ```bash
-rake chewy:reset # resets all the existing indices, declared in app/chewy
+rake chewy:reset # resets all the existing indices
 rake chewy:reset[users] # resets UsersIndex only
-rake chewy:reset[users,projects] # resets UsersIndex and ProjectsIndex
-rake chewy:reset[-users,projects] # resets every index in application except specified ones
-
-rake chewy:update # updates all the existing indices, declared in app/chewy
-rake chewy:update[users] # updates UsersIndex only
-rake chewy:update[users,projects] # updates UsersIndex and ProjectsIndex
-rake chewy:update[-users,projects] # updates every index in application except specified ones
-
+rake chewy:reset[users,places] # resets UsersIndex and PlacesIndex
+rake chewy:reset[-users,places] # resets every index in the application except specified ones
 ```
 
-`rake chewy:reset` performs zero-downtime reindexing as described [here](https://www.elastic.co/blog/changing-mapping-with-zero-downtime). So basically rake task creates a new index with uniq suffix and then simply aliases it to the common index name. The previous index is deleted afterwards (see `Chewy::Index.reset!` for more details).
+#### `chewy:upgrade`
+
+Performs reset exactly the same way as `chewy:reset` does, but only when the index specification (setting or mapping) was changed.
+
+It works only when index specification is locked in `Chewy::Stash::Specification` index. The first run will reset all indexes and lock their specifications.
+
+See [Chewy::Stash::Specification](lib/chewy/stash.rb) and [Chewy::Index::Specification](lib/chewy/index/specification.rb) for more details.
 
 
-### Rspec integration
+```bash
+rake chewy:upgrade # upgrades all the existing indices
+rake chewy:upgrade[users] # upgrades UsersIndex only
+rake chewy:upgrade[users,places] # upgrades UsersIndex and PlacesIndex
+rake chewy:upgrade[-users,places] # upgrades every index in the application except specified ones
+```
+
+#### `chewy:update`
+
+It doesn't create indexes, it simply imports everything to the existing ones and fails if the index was not created before.
+
+Unlike `reset` or `upgrade` tasks, it is possible to pass type references to update the particular type. In index name is passed without the type specified, it will update all the types defined for this index.
+
+```bash
+rake chewy:update # updates all the existing indices
+rake chewy:update[users] # updates UsersIndex only
+rake chewy:update[users,places#city] # updates the whole UsersIndex and PlacesIndex::City type
+rake chewy:update[-users,places#city] # updates every index in the application except every type defined in UsersIndex and the rest of the types defined in PlacesIndex
+```
+
+#### `chewy:sync`
+
+Provides a way to synchronize outdated indexes with the source quickly and without doing a full reset.
+
+Arguments are similar to the ones taken by `chewy:update` task. It is possible to specify a particular type or a whole index.
+
+See [Chewy::Type::Syncer](lib/chewy/type/syncer.rb) for more details.
+
+```bash
+rake chewy:sync # synchronizes all the existing indices
+rake chewy:sync[users] # synchronizes UsersIndex only
+rake chewy:sync[users,places#city] # synchronizes the whole UsersIndex and PlacesIndex::City type
+rake chewy:sync[-users,places#city] # synchronizes every index in the application except every type defined in UsersIndex and the rest of the types defined in PlacesIndex
+```
+
+#### `chewy:deploy`
+
+This rake task is especially useful during the production deploy. It is a combination of `chewy:upgrade` and `chewy:sync` and the latter is called only for the indexes that were not reset during the first stage.
+
+It is not possible to specify any particular types/indexes for this task as it doesn't make much sense.
+
+Right now the approach is that if some data had been updated, but index definition was not changed (no changes satisfying the synchronization algorithm were done), it would be much faster to perform manual partial index update inside data migrations or even manually after the deploy.
+
+Also, there is always full reset alternative with `rake chewy:reset`.
+
+#### Parallelizing rake tasks
+
+Every task described above has its own parallel version. Every parallel rake task takes the number for processes for execution as the first argument and the rest of the arguments are exactly the same as for the non-parallel task version.
+
+[https://github.com/grosser/parallel](https://github.com/grosser/parallel) gem is required to use these tasks.
+
+If the number of processes is not specified explicitly - `parallel` gem tries to automatically derive the number of processes to use.
+
+```bash
+rake chewy:parallel:reset
+rake chewy:parallel:upgrade[4]
+rake chewy:parallel:update[4,places#city]
+rake chewy:parallel:sync[4,-users]
+rake chewy:parallel:deploy[4] # performs parallel upgrade and parallel sync afterwards
+```
+
+#### `chewy:journal`
+
+This namespace contains two tasks for the journal manipulations: `chewy:journal:apply` and `chewy:journal:clean`. Both are taking time as the first argument (optional for clean) and a list of indexes/types exactly as the tasks above. Time can be in any format parsable by ActiveSupport.
+
+```bash
+rake chewy:journal:apply["$(date -v-1H -u +%FT%TZ)"] # apply journaled changes for the past hour
+rake chewy:journal:apply["$(date -v-1H -u +%FT%TZ)",users] # apply journaled changes for the past hour on UsersIndex only
+```
+
+### RSpec integration
 
 Just add `require 'chewy/rspec'` to your spec_helper.rb and you will get additional features: See [update_index.rb](lib/chewy/rspec/update_index.rb) for more details.
 
@@ -1288,21 +1096,18 @@ Just add `require 'chewy/rspec'` to your spec_helper.rb and you will get additio
 
 Add `require 'chewy/minitest'` to your test_helper.rb, and then for tests which you'd like indexing test hooks, `include Chewy::Minitest::Helpers`.
 
+Since you can set `:bypass` strategy for test suites and manually handle import for the index and manually flush test indices using `Chewy.massacre`. This will help reduce unnecessary ES requests
+
+But if you require chewy to index/update model regularly in your test suite then you can specify `:urgent` strategy for documents indexing. Add `Chewy.strategy(:urgent)` to test_helper.rb.
+
 ### DatabaseCleaner
 
-If you use `DatabaseCleaner` in your tests with [the `transaction` strategy](https://github.com/DatabaseCleaner/database_cleaner#how-to-use), you may run into the problem that `ActiveRecord`'s models are not indexed automatically on save despite the fact that you set the callbacks to do this with the `update_index` method. The issue arises because `chewy` indexes data on `after_commit` run as default, but all `after_commit` callbacks are not run with the `DatabaseCleaner`'s' `transaction` strategy. You can solve this issue by changing the `Chewy.use_after_commit_callbacks` option. Just add the following initializer in your Rails application:
+If you use `DatabaseCleaner` in your tests with [the `transaction` strategy](https://github.com/DatabaseCleaner/database_cleaner#how-to-use), you may run into the problem that `ActiveRecord`'s models are not indexed automatically on save despite the fact that you set the callbacks to do this with the `update_index` method. The issue arises because `chewy` indices data on `after_commit` run as default, but all `after_commit` callbacks are not run with the `DatabaseCleaner`'s' `transaction` strategy. You can solve this issue by changing the `Chewy.use_after_commit_callbacks` option. Just add the following initializer in your Rails application:
 
 ```ruby
 #config/initializers/chewy.rb
 Chewy.use_after_commit_callbacks = !Rails.env.test?
 ```
-
-## TODO a.k.a coming soon:
-
-* Typecasting support
-* Advanced (simplified) query DSL: `UsersIndex.query { email == 'my@gmail.com' }` will produce term query
-* update_all support
-* Maybe, closer ORM/ODM integration, creating index classes implicitly
 
 ## Contributing
 
@@ -1319,3 +1124,8 @@ Use the following Rake tasks to control the Elasticsearch cluster while developi
 rake elasticsearch:start # start Elasticsearch cluster on 9250 port for tests
 rake elasticsearch:stop # stop Elasticsearch
 ```
+
+## Copyright
+
+Copyright (c) 2013-2021 Toptal, LLC. See [LICENSE.txt](LICENSE.txt) for
+further details.

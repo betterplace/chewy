@@ -50,7 +50,11 @@ describe Chewy::Type::Observe do
         Country.one_to_many :cities
         City.plugin :dirty
       else
-        City.belongs_to :country
+        if adapter == :mongoid && Mongoid::VERSION.start_with?('6')
+          City.belongs_to :country, optional: true
+        else
+          City.belongs_to :country
+        end
         Country.has_many :cities
       end
 
@@ -71,11 +75,11 @@ describe Chewy::Type::Observe do
       specify { expect { city.save! }.to update_index('cities#city').and_reindex(city).only }
       specify { expect { city.save! }.to update_index('countries#country').and_reindex(country1).only }
 
-      specify { expect { city.update_attributes!(country: nil) }.to update_index('cities#city').and_reindex(city).only }
-      specify { expect { city.update_attributes!(country: nil) }.to update_index('countries#country').and_reindex(country1).only }
+      specify { expect { city.update!(country: nil) }.to update_index('cities#city').and_reindex(city).only }
+      specify { expect { city.update!(country: nil) }.to update_index('countries#country').and_reindex(country1).only }
 
-      specify { expect { city.update_attributes!(country: country2) }.to update_index('cities#city').and_reindex(city).only }
-      specify { expect { city.update_attributes!(country: country2) }.to update_index('countries#country').and_reindex(country1, country2).only }
+      specify { expect { city.update!(country: country2) }.to update_index('cities#city').and_reindex(city).only }
+      specify { expect { city.update!(country: country2) }.to update_index('countries#country').and_reindex(country1, country2).only }
     end
 
     context do

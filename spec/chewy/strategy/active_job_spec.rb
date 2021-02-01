@@ -2,7 +2,12 @@ require 'spec_helper'
 
 if defined?(::ActiveJob)
   describe Chewy::Strategy::ActiveJob do
-    around { |example| Chewy.strategy(:bypass) { example.run } }
+    around do |example|
+      active_job_settings = Chewy.settings[:active_job]
+      Chewy.settings[:active_job] = {queue: 'low'}
+      Chewy.strategy(:bypass) { example.run }
+      Chewy.settings[:active_job] = active_job_settings
+    end
     before(:all) do
       ::ActiveJob::Base.logger = Chewy.logger
     end
@@ -36,7 +41,15 @@ if defined?(::ActiveJob)
       end
       enqueued_job = ::ActiveJob::Base.queue_adapter.enqueued_jobs.first
       expect(enqueued_job[:job]).to eq(Chewy::Strategy::ActiveJob::Worker)
-      expect(enqueued_job[:queue]).to eq('chewy')
+      expect(enqueued_job[:queue]).to eq('low')
+    end
+
+    specify do
+      Chewy.strategy(:active_job) do
+        [city, other_city].map(&:save!)
+      end
+      enqueued_job = ::ActiveJob::Base.queue_adapter.enqueued_jobs.first
+      expect(enqueued_job[:queue]).to eq('low')
     end
 
     specify do
@@ -48,6 +61,12 @@ if defined?(::ActiveJob)
 
     specify do
       expect(CitiesIndex::City).to receive(:import!).with([city.id, other_city.id], suffix: '201601')
+      Chewy::Strategy::ActiveJob::Worker.new.perform('CitiesIndex::City', [city.id, other_city.id], suffix: '201601')
+    end
+
+    specify do
+      allow(Chewy).to receive(:disable_refresh_async).and_return(true)
+      expect(CitiesIndex::City).to receive(:import!).with([city.id, other_city.id], suffix: '201601', refresh: false)
       Chewy::Strategy::ActiveJob::Worker.new.perform('CitiesIndex::City', [city.id, other_city.id], suffix: '201601')
     end
   end

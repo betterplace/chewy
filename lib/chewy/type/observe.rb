@@ -9,14 +9,6 @@ module Chewy
           method = args.first
 
           proc do
-            backreference = if method && method.to_s == 'self'
-              self
-            elsif method
-              send(method)
-            else
-              instance_eval(&block)
-            end
-
             reference = if type_name.is_a?(Proc)
               if type_name.arity.zero?
                 instance_exec(&type_name)
@@ -27,14 +19,26 @@ module Chewy
               type_name
             end
 
-            Chewy.derive_type(reference).update_index(backreference, options)
+            type = Chewy.derive_type(reference)
+
+            next if Chewy.strategy.current.name == :bypass
+
+            backreference = if method && method.to_s == 'self'
+              self
+            elsif method
+              send(method)
+            else
+              instance_eval(&block)
+            end
+
+            type.update_index(backreference, options)
           end
         end
 
         def extract_callback_options!(args)
           options = args.extract_options!
           result = options.each_key.with_object({}) do |key, hash|
-            hash[key] = options.delete(key) if [:if, :unless].include?(key)
+            hash[key] = options.delete(key) if %i[if unless].include?(key)
           end
           args.push(options) unless options.empty?
           result
@@ -59,10 +63,10 @@ module Chewy
           update_proc = Observe.update_proc(type_name, *args, &block)
 
           if Chewy.use_after_commit_callbacks
-            after_commit(callback_options, &update_proc)
+            after_commit(**callback_options, &update_proc)
           else
-            after_save(callback_options, &update_proc)
-            after_destroy(callback_options, &update_proc)
+            after_save(**callback_options, &update_proc)
+            after_destroy(**callback_options, &update_proc)
           end
         end
       end

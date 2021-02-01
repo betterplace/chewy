@@ -14,6 +14,8 @@ module Chewy
         if Rails.application.config.respond_to?(:assets) && env['PATH_INFO'].start_with?(Rails.application.config.assets.prefix)
           @app.call(env)
         else
+          Chewy.logger.info("Chewy request strategy is `#{Chewy.request_strategy}`") if Chewy.logger && @request_strategy != Chewy.request_strategy
+          @request_strategy = Chewy.request_strategy
           Chewy.strategy(Chewy.request_strategy) { @app.call(env) }
         end
       end
@@ -41,13 +43,12 @@ module Chewy
     end
 
     console do |app|
-      Chewy.logger = ActiveRecord::Base.logger if defined?(ActiveRecord)
-
       if app.sandbox?
         Chewy.strategy(:bypass)
       else
         Chewy.strategy(:urgent)
       end
+      puts "Chewy console strategy is `#{Chewy.strategy.current.name}`"
     end
 
     initializer 'chewy.logger', after: 'active_record.logger' do
@@ -67,7 +68,7 @@ module Chewy
     end
 
     initializer 'chewy.request_strategy' do |app|
-      app.config.middleware.insert_after(Rails::Rack::Logger, RequestStrategy)
+      app.config.middleware.insert_before(ActionDispatch::ShowExceptions, RequestStrategy)
     end
 
     initializer 'chewy.add_indices_path' do |_app|

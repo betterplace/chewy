@@ -35,17 +35,20 @@ module Chewy
           !!_witchcraft
         end
 
-        def cauldron
-          @cauldron ||= Cauldron.new(self)
+        def cauldron(**options)
+          (@cauldron ||= {})[options] ||= Cauldron.new(self, **options)
         end
       end
 
       class Cauldron
         attr_reader :locals
 
-        def initialize(type)
+        # @param type [Chewy::Type] type for composition
+        # @param fields [Array<Symbol>] restricts the fields for composition
+        def initialize(type, fields: [])
           @type = type
           @locals = []
+          @fields = fields
         end
 
         def brew(object, crutches = nil)
@@ -55,9 +58,9 @@ module Chewy
       private
 
         def alicorn
-          @alicorn ||= class_eval <<-RUBY
+          @alicorn ||= singleton_class.class_eval <<-RUBY, __FILE__, __LINE__ + 1
             -> (locals, object0, crutches) do
-              #{composed_values(@type.root_object, 0)}
+              #{composed_values(@type.root, 0)}
             end
           RUBY
         end
@@ -76,7 +79,9 @@ module Chewy
           if field.children.present? && !field.multi_field?
             <<-RUBY
               (result#{nesting} = #{fetcher}
-              if result#{nesting}.respond_to?(:to_ary)
+              if result#{nesting}.nil?
+                nil
+              elsif result#{nesting}.respond_to?(:to_ary)
                 result#{nesting}.map do |object#{nesting}|
                   #{composed_values(field, nesting)}
                 end
@@ -91,7 +96,7 @@ module Chewy
         end
 
         def non_proc_values(field, nesting)
-          non_proc_fields = non_proc_fields_for(field)
+          non_proc_fields = non_proc_fields_for(field, nesting)
           object = "object#{nesting}"
 
           if non_proc_fields.present?
@@ -99,14 +104,16 @@ module Chewy
               (if #{object}.is_a?(Hash)
                 {
                   #{non_proc_fields.map do |f|
-                    fetcher = "#{object}.has_key?(:#{f.name}) ? #{object}[:#{f.name}] : #{object}['#{f.name}']"
-                    "#{f.name}: #{composed_value(f, fetcher, nesting)}"
+                    key_name = f.value.is_a?(Symbol) || f.value.is_a?(String) ? f.value : f.name
+                    fetcher = "#{object}.has_key?(:#{key_name}) ? #{object}[:#{key_name}] : #{object}['#{key_name}']"
+                    "'#{f.name}'.freeze => #{composed_value(f, fetcher, nesting)}"
                   end.join(', ')}
                 }
               else
                 {
                   #{non_proc_fields.map do |f|
-                    "#{f.name}: #{composed_value(f, "#{object}.#{f.name}", nesting)}"
+                    method_name = f.value.is_a?(Symbol) || f.value.is_a?(String) ? f.value : f.name
+                    "'#{f.name}'.freeze => #{composed_value(f, "#{object}.#{method_name}", nesting)}"
                   end.join(', ')}
                 }
               end)
@@ -117,13 +124,13 @@ module Chewy
         end
 
         def proc_values(field, nesting)
-          proc_fields = proc_fields_for(field)
+          proc_fields = proc_fields_for(field, nesting)
 
           if proc_fields.present?
             <<-RUBY
               {
                 #{proc_fields.map do |f|
-                  "#{f.name}: (#{composed_value(f, source_for(f.value, nesting), nesting)})"
+                  "'#{f.name}'.freeze => (#{composed_value(f, source_for(f.value, nesting), nesting)})"
                 end.join(', ')}
               }
             RUBY
@@ -132,14 +139,26 @@ module Chewy
           end
         end
 
-        def non_proc_fields_for(parent)
+        def non_proc_fields_for(parent, nesting)
           return [] unless parent
-          (parent.children || []).select { |field| !(field.value && field.value.is_a?(Proc)) }
+          fields = (parent.children || []).reject { |field| field.value.is_a?(Proc) }
+
+          if nesting.zero? && @fields.present?
+            fields.select { |f| @fields.include?(f.name) }
+          else
+            fields
+          end
         end
 
-        def proc_fields_for(parent)
+        def proc_fields_for(parent, nesting)
           return [] unless parent
-          (parent.children || []).select { |field| field.value && field.value.is_a?(Proc) }
+          fields = (parent.children || []).select { |field| field.value.is_a?(Proc) }
+
+          if nesting.zero? && @fields.present?
+            fields.select { |f| @fields.include?(f.name) }
+          else
+            fields
+          end
         end
 
         def source_for(proc, nesting)
@@ -166,7 +185,6 @@ module Chewy
               locals.push(proc.binding.eval(variable.to_s))
               source = replace_local(source, variable, locals.size - 1)
             end
-
           end
 
           Unparser.unparse(source)
