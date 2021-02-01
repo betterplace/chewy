@@ -101,7 +101,7 @@ module Chewy
       private
 
         def import_routine(*args)
-          routine = Routine.new(self, args.extract_options!)
+          routine = Routine.new(self, **args.extract_options!)
           routine.create_indexes!
 
           ActiveSupport::Notifications.instrument 'import_objects.chewy', type: self do |payload|
